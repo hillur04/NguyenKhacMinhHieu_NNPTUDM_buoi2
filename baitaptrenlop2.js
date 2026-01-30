@@ -1,260 +1,236 @@
-// Script: fetch products, realtime search (onChanged), dropdown sort and pagination (5 per page)
-let products = [];
-let filtered = [];
-let currentPage = 1;
-let itemsPerPage = 5; // dynamic; can change via select
-let currentSort = { by: null, order: 'asc' };
-const originalIndex = new Map();
+//HTTP request Get,post,put,delete
+async function Load() {
+    try {
+        let res = await fetch('http://localhost:3000/posts')
+        let data = await res.json();
+        let body = document.getElementById("table-body");
+        body.innerHTML = "";
+        for (const post of data) {
+            let titleDisplay = post.isDeleted ? `<s>${post.title}</s>` : post.title;
+            let viewsDisplay = post.isDeleted ? `<s>${post.views}</s>` : post.views;
+            body.innerHTML += `
+            <tr>
+                <td>${post.id}</td>
+                <td>${titleDisplay}</td>
+                <td>${viewsDisplay}</td>
+                <td><input value="Delete" type="submit" onclick="Delete(${post.id})" /></td>
+            </tr>`
+        }
+    } catch (error) {
 
-const tableBody = document.getElementById('table-body');
-const paginationEl = document.getElementById('pagination');
-const totalCountEl = document.getElementById('total-count');
-const perPageSelect = document.getElementById('perPageSelect');
-const editModal = document.getElementById('editModal');
-const modalTitle = document.getElementById('modalTitle');
-const modalPrice = document.getElementById('modalPrice');
-const modalDescription = document.getElementById('modalDescription');
-const modalImage = document.getElementById('modalImage');
-let lastQuery = '';
-let editingId = null;
-
-function rebuildOriginalIndex(){
-    originalIndex.clear();
-    products.forEach((p, idx) => originalIndex.set(p.id, idx));
+    }
+}async function SelectComment(id) {
+    let res = await fetch('http://localhost:3000/comments/' + id);
+    if (res.ok) {
+        let comment = await res.json();
+        document.getElementById("comment_id_txt").value = comment.id;
+        document.getElementById("comment_text_txt").value = comment.text;
+    }
 }
-
-function fetchProducts(){
-    fetch('db.json')
-        .then(r => r.json())
-        .then(data => {
-            products = Array.isArray(data) ? data : [];
-            rebuildOriginalIndex();
-            filtered = products.slice();
-            updateTotal();
-            applySort();
-            // init per page select if present
-            if(perPageSelect) perPageSelect.value = String(itemsPerPage);
-            renderTable();
-            renderPagination();
-        })
-        .catch(err => {
-            console.error('Lỗi:', err);
-            tableBody.innerHTML = '<tr><td colspan="7">Không thể tải dữ liệu.</td></tr>';
+async function UpdateComment() {
+    let id = document.getElementById("comment_id_txt").value;
+    let text = document.getElementById("comment_text_txt").value;
+    if (!id) {
+        alert("Please select a comment to update");
+        return;
+    }
+    let getRes = await fetch('http://localhost:3000/comments/' + id);
+    if (getRes.ok) {
+        let comment = await getRes.json();
+        let res = await fetch('http://localhost:3000/comments/' + id, {
+            method: 'PUT',
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                ...comment,
+                text: text
+            })
         });
-}
-
-// Called on input (realtime). The function name matches the requirement 'onChanged'.
-function onChanged(event){
-    const q = (event.target.value || '').trim().toLowerCase();
-    lastQuery = q;
-    applyCurrentSearch();
-    currentPage = 1;
-    updateTotal();
-    applySort();
-    renderTable();
-    renderPagination();
-}
-
-function applyCurrentSearch(){
-    const q = lastQuery;
-    if(!q){
-        filtered = products.slice();
+        if (res.ok) {
+            console.log("comment updated");
+            LoadComments();
+            // Clear form
+            document.getElementById("comment_id_txt").value = "";
+            document.getElementById("comment_text_txt").value = "";
+        }
+    }
+}async function Save() {
+    let id = document.getElementById("id_txt").value;
+    let title = document.getElementById("title_txt").value;
+    let views = document.getElementById("views_txt").value;
+    let res;
+    if (!id) {
+        // Tạo mới, tự động ID
+        let postsRes = await fetch('http://localhost:3000/posts');
+        let posts = await postsRes.json();
+        let maxId = 0;
+        for (const post of posts) {
+            let numId = parseInt(post.id);
+            if (numId > maxId) maxId = numId;
+        }
+        id = (maxId + 1).toString();
+        res = await fetch('http://localhost:3000/posts', {
+            method: 'POST',
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(
+                {
+                    id: id,
+                    title: title,
+                    views: views,
+                    isDeleted: false
+                }
+            )
+        });
     } else {
-        filtered = products.filter(p => (p.title || '').toLowerCase().includes(q));
+        let getID = await fetch('http://localhost:3000/posts/' + id);
+        if (getID.ok) {
+            // Update
+            let existing = await getID.json();
+            res = await fetch('http://localhost:3000/posts/'+id, {
+                method: 'PUT',
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(
+                    {
+                        ...existing,
+                        title: title,
+                        views: views
+                    }
+                )
+            });
+        } else {
+            // Create với ID đã nhập
+            res = await fetch('http://localhost:3000/posts', {
+                method: 'POST',
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(
+                    {
+                        id: id,
+                        title: title,
+                        views: views,
+                        isDeleted: false
+                    }
+                )
+            });
+        }
+    }
+    if (res.ok) {
+        console.log("them thanh cong");
+        Load(); // Reload sau save
     }
 }
-
-function onFilterChanged(event){
-    const val = event.target.value;
-    if(val === 'default'){
-        currentSort.by = null;
-        currentSort.order = 'asc';
-    } else if(val === 'title-asc'){
-        currentSort.by = 'title'; currentSort.order = 'asc';
-    } else if(val === 'title-desc'){
-        currentSort.by = 'title'; currentSort.order = 'desc';
-    } else if(val === 'price-desc'){
-        currentSort.by = 'price'; currentSort.order = 'desc';
-    } else if(val === 'price-asc'){
-        currentSort.by = 'price'; currentSort.order = 'asc';
+async function Delete(id) {
+    let getRes = await fetch('http://localhost:3000/posts/' + id);
+    if (getRes.ok) {
+        let post = await getRes.json();
+        let res = await fetch('http://localhost:3000/posts/' + id, {
+            method: 'PUT',
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                ...post,
+                isDeleted: true
+            })
+        });
+        if (res.ok) {
+            console.log("xoa mem thanh cong");
+            Load(); // Reload sau delete
+        }
     }
-    currentPage = 1;
-    applySort();
-    renderTable();
-    renderPagination();
 }
+async function LoadComments() {
+    try {
+        let res = await fetch('http://localhost:3000/comments')
+        let data = await res.json();
+        let body = document.getElementById("comments-table-body");
+        body.innerHTML = "";
+        for (const comment of data) {
+            let textDisplay = comment.isDeleted ? `<s>${comment.text}</s>` : comment.text;
+            body.innerHTML += `
+            <tr data-id="${comment.id}" onclick="SelectComment(${comment.id})" style="cursor: pointer;">
+                <td>${comment.id}</td>
+                <td>${textDisplay}</td>
+                <td>
+                    <input value="Delete" type="button" onclick="DeleteComment(${comment.id}); event.stopPropagation();" />
+                </td>
+            </tr>`
+        }
+    } catch (error) {
 
-function onPerPageChanged(event){
-    const val = Number(event.target.value) || 5;
-    itemsPerPage = val;
-    currentPage = 1;
-    renderTable();
-    renderPagination();
+    }
 }
-
-function updateTotal(){
-    totalCountEl.textContent = filtered.length;
+function EditComment(id) {
+    let tr = document.querySelector(`tr[data-id="${id}"]`);
+    let tdText = tr.children[1];
+    let text = tdText.innerText; // Lấy text, bỏ <s> nếu có
+    tdText.innerHTML = `<input type="text" value="${text}" id="edit_text_${id}" />`;
+    let tdActions = tr.children[2];
+    tdActions.innerHTML = `
+        <input value="Save" type="button" onclick="SaveEdit(${id})" />
+        <input value="Cancel" type="button" onclick="LoadComments()" />
+    `;
 }
-
-function applySort(){
-    // default: restore original order
-    if(!currentSort.by){
-        filtered.sort((a,b) => (originalIndex.get(a.id) || 0) - (originalIndex.get(b.id) || 0));
+async function SaveComment() {
+    let text = document.getElementById("comment_text_txt").value;
+    if (!text) {
+        alert("Please enter text");
         return;
     }
-    const {by, order} = currentSort;
-    filtered.sort((a,b) => {
-        if(by === 'title'){
-            const A = (a.title || '').toLowerCase();
-            const B = (b.title || '').toLowerCase();
-            if(A < B) return order === 'asc' ? -1 : 1;
-            if(A > B) return order === 'asc' ? 1 : -1;
-            return 0;
-        }
-        if(by === 'price'){
-            const A = Number(a.price) || 0;
-            const B = Number(b.price) || 0;
-            return order === 'asc' ? A - B : B - A;
-        }
-        return 0;
-    });
-}
-
-function renderTable(){
-    tableBody.innerHTML = '';
-    const start = (currentPage - 1) * itemsPerPage;
-    const pageItems = filtered.slice(start, start + itemsPerPage);
-
-    if(pageItems.length === 0){
-        tableBody.innerHTML = '<tr><td colspan="7" style="color:var(--muted)">Không có sản phẩm phù hợp.</td></tr>';
-        return;
+    // Tạo mới, tự động ID
+    let commentsRes = await fetch('http://localhost:3000/comments');
+    let comments = await commentsRes.json();
+    let maxId = 0;
+    for (const comment of comments) {
+        let numId = parseInt(comment.id);
+        if (numId > maxId) maxId = numId;
     }
-
-    pageItems.forEach((product, idx) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${product.id}</td>
-            <td>
-                <div class="title">${escapeHtml(product.title || '—')}</div>
-                <div class="category">${escapeHtml(product.brand || '')}</div>
-            </td>
-            <td>${escapeHtml(product.slug || 'N/A')}</td>
-            <td class="price">${formatCurrency(product.price)}</td>
-            <td>${escapeHtml((product.category && product.category.name) || '')}</td>
-            <td class="img-wrap"><img loading="lazy" src="${(product.images && product.images[0]) || 'https://via.placeholder.com/80?text=No+Image'}" alt="product image" onerror="this.onerror=null;this.src='https://via.placeholder.com/80?text=No+Image'"></td>
-            <td>
-                <div style="display:flex;gap:8px">
-                    <button class="btn btn-sm btn-outline-primary" onclick="editProduct(${product.id})">Sửa</button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteProduct(${product.id})">Xóa</button>
-                </div>
-            </td>
-        `;
-        tableBody.appendChild(tr);
+    let id = (maxId + 1).toString();
+    let res = await fetch('http://localhost:3000/comments', {
+        method: 'POST',
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(
+            {
+                id: id,
+                text: text,
+                isDeleted: false
+            }
+        )
     });
-}
-
-function renderPagination(){
-    paginationEl.innerHTML = '';
-    const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
-    // prev button
-    const prev = document.createElement('button');
-    prev.className = 'page-btn';
-    prev.textContent = '<';
-    prev.disabled = currentPage === 1;
-    prev.onclick = () => { if(currentPage>1){ currentPage--; renderTable(); renderPagination(); window.scrollTo({top:0,behavior:'smooth'});} };
-    paginationEl.appendChild(prev);
-
-    // numbered buttons
-    for(let i=1;i<=totalPages;i++){
-        const btn = document.createElement('button');
-        btn.className = 'page-btn' + (i===currentPage? ' active':'');
-        btn.textContent = i;
-        btn.onclick = (() => { const page = i; return () => { currentPage = page; renderTable(); renderPagination(); window.scrollTo({top:0,behavior:'smooth'}); }; })();
-        paginationEl.appendChild(btn);
+    if (res.ok) {
+        console.log("comment saved");
+        LoadComments();
+        // Clear form
+        document.getElementById("comment_text_txt").value = "";
     }
-
-    // next button
-    const next = document.createElement('button');
-    next.className = 'page-btn';
-    next.textContent = '>';
-    next.disabled = currentPage === totalPages;
-    next.onclick = () => { if(currentPage<totalPages){ currentPage++; renderTable(); renderPagination(); window.scrollTo({top:0,behavior:'smooth'});} };
-    paginationEl.appendChild(next);
 }
-
-// actions: delete and edit
-function deleteProduct(id){
-    if(!confirm('Bạn có chắc muốn xóa sản phẩm này?')) return;
-    const idx = products.findIndex(p => p.id === id);
-    if(idx === -1) return alert('Không tìm thấy sản phẩm.');
-    products.splice(idx,1);
-    rebuildOriginalIndex();
-    applyCurrentSearch();
-    updateTotal();
-    applySort();
-    const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
-    if(currentPage > totalPages) currentPage = totalPages;
-    renderTable();
-    renderPagination();
+async function DeleteComment(id) {
+    let getRes = await fetch('http://localhost:3000/comments/' + id);
+    if (getRes.ok) {
+        let comment = await getRes.json();
+        let res = await fetch('http://localhost:3000/comments/' + id, {
+            method: 'PUT',
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                ...comment,
+                isDeleted: true
+            })
+        });
+        if (res.ok) {
+            console.log("comment deleted softly");
+            LoadComments(); // Reload sau delete
+        }
+    }
 }
-
-function editProduct(id){
-    const p = products.find(x => x.id === id);
-    if(!p) return alert('Không tìm thấy sản phẩm.');
-    editingId = id;
-    modalTitle.value = p.title || '';
-    modalPrice.value = p.price || '';
-    modalDescription.value = p.description || '';
-    modalImage.value = (p.images && p.images[0]) || '';
-    editModal.classList.add('active');
-}
-
-function closeModal(){
-    editingId = null;
-    editModal.classList.remove('active');
-}
-
-function saveEdit(){
-    if(editingId === null) return;
-    const p = products.find(x => x.id === editingId);
-    if(!p) return alert('Không tìm thấy sản phẩm.');
-    p.title = modalTitle.value.trim() || p.title;
-    p.price = Number(modalPrice.value) || p.price;
-    p.description = modalDescription.value.trim() || p.description;
-    const imgUrl = modalImage.value.trim();
-    if(imgUrl) p.images = [imgUrl];
-    rebuildOriginalIndex();
-    applyCurrentSearch();
-    applySort();
-    updateTotal();
-    renderTable();
-    renderPagination();
-    closeModal();
-}
-
-// Small helpers
-function formatCurrency(v){
-    const n = Number(v);
-    if(isNaN(n)) return '-';
-    return n.toLocaleString('en-US', {style:'currency', currency:'USD'});
-}
-
-function truncate(str, max){
-    return str.length > max ? str.slice(0,max-1) + '…' : str;
-}
-
-function escapeHtml(str){
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
-// close modal on ESC or outside click
-document.addEventListener('keydown', (e) => { if(e.key === 'Escape') closeModal(); });
-if(editModal) editModal.addEventListener('click', (e) => { if(e.target === editModal) closeModal(); });
-
-// init
-fetchProducts();
+Load();
+LoadComments();

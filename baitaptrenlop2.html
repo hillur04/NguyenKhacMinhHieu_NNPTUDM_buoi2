@@ -1,172 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Danh sách sản phẩm</title>
-    <!-- Google Font and Bootstrap -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        :root{
-            --bg:#ffffff; /* white base */
-            --card:#ffffff;
-            --neon-green:#00ff7f; /* neon lime */
-            --neon-blue:#00d4ff;  /* neon cyan */
-            --neon-yellow:#ffd300; /* neon yellow */
-            --muted:#46505a; /* neutral */
-            --soft-shadow: rgba(0,0,0,0.06);
-        }
-        *{box-sizing:border-box;font-family:'Poppins',system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial}
-        body{margin:0;background:linear-gradient(180deg,#ffffff 0%, #f2fbff 100%);color:#071428}
-        .container{max-width:1100px;margin:36px auto;padding:22px;background:var(--card);border-radius:14px;box-shadow:0 12px 36px var(--soft-shadow);border:1px solid rgba(6,8,14,0.04)}
-        header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
-        h1{margin:0;font-weight:800;letter-spacing:0.6px;color:var(--neon-blue);text-shadow:0 2px 12px rgba(0,212,255,0.06)}
-        .tagline{color:var(--muted);font-size:13px}
-
-        /* Controls */
-        .controls{margin:18px 0}
-        .search .form-control{padding:14px;border-radius:12px;border:1px solid rgba(0,212,255,0.12);box-shadow:0 8px 22px rgba(0,212,255,0.03);background:linear-gradient(180deg,rgba(255,255,255,0.9),#fff)}
-        .form-select{border-radius:10px}
-        .filter-label{color:var(--muted);font-size:13px}
-
-        /* Table */
-        .table thead th{border-bottom:2px solid rgba(6,12,30,0.06);background:#fff;color:#0b1530}
-        .table-hover tbody tr:hover{background:linear-gradient(90deg,rgba(0,212,255,0.03),rgba(0,255,127,0.02))}
-        .table-hover tbody tr:hover td:first-child{border-left:4px solid var(--neon-yellow)}
-        .img-wrap img{width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid rgba(0,212,255,0.08);box-shadow:0 8px 30px rgba(0,212,255,0.03)}
-        .title{font-weight:700;color:#071428}
-        .category{font-size:13px;color:var(--muted)}
-        .price{font-weight:800;color:var(--neon-green);text-shadow:0 2px 8px rgba(0,255,127,0.06)}
-
-        /* Buttons & pagination */
-        .btn-outline-primary{color:var(--neon-blue);border-color:rgba(0,212,255,0.16)}
-        .btn-outline-primary:hover{background:rgba(0,212,255,0.06);border-color:var(--neon-blue);box-shadow:0 6px 20px rgba(0,212,255,0.06)}
-        .btn-outline-danger{color:var(--neon-yellow);border-color:rgba(255,211,0,0.12)}
-        .page-btn{padding:6px 10px;border-radius:8px;border:1px solid rgba(6,12,30,0.06);background:transparent;color:var(--muted);cursor:pointer}
-        .page-btn.active{background:linear-gradient(90deg,var(--neon-green),var(--neon-blue));color:#00121a;border-color:transparent;font-weight:700;box-shadow:0 8px 30px rgba(0,212,255,0.08)}
-
-        .footer-note{color:var(--muted);font-size:13px;margin-top:12px}
-
-        /* small visual tweaks */
-        .brand-accent{display:inline-block;padding:6px 10px;background:linear-gradient(90deg,var(--neon-blue),var(--neon-green));color:#00121a;border-radius:999px;font-weight:700}
-
-        @media (max-width:780px){
-            .img-wrap img{width:56px;height:56px}
-            .search .form-control{padding:12px}
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <div>
-                <h1>DANH SÁCH SẢN PHẨM</h1>
-                <div class="tagline">Sporty &amp; Luxury collection ✦ Clothes • Shoes • Stuffs</div>
-            </div>
-            <div style="text-align:right;color:var(--muted)">
-                <div style="font-size:12px">Tổng: <span id="total-count">0</span> sản phẩm</div>
-            </div>
-        </header>
-
-        <div class="controls">
-            <div class="row mb-3">
-                <div class="col-12">
-                    <input id="search" class="form-control form-control-lg" type="search" placeholder="Tìm sản phẩm" oninput="onChanged(event)">
-                </div>
-            </div>
-            <div class="row g-2 align-items-center">
-                <div class="col-md-6 d-flex align-items-center gap-2">
-                    <label for="filterSelect" class="mb-0 text-muted">Sắp xếp</label>
-                    <select id="filterSelect" class="form-select form-select-sm w-auto" onchange="onFilterChanged(event)">
-                        <option value="default">Mặc định</option>
-                        <option value="title-asc">Tên A - Z</option>
-                        <option value="title-desc">Tên Z - A</option>
-                        <option value="price-desc">Giá: cao → thấp</option>
-                        <option value="price-asc">Giá: thấp → cao</option>
-                    </select>
-                </div>
-                <div class="col-md-6 d-flex justify-content-md-end align-items-center gap-2">
-                    <label for="perPageSelect" class="mb-0 text-muted">Số Sản Phẩm Hiển Thị Trên 1 Trang</label>
-                    <select id="perPageSelect" class="form-select form-select-sm w-auto" onchange="onPerPageChanged(event)">
-                        <option value="5">5 sản phẩm</option>
-                        <option value="10">10 sản phẩm</option>
-                        <option value="20">20 sản phẩm</option>
-                    </select>
-                </div>
-            </div>
-        </div> 
-
-        <style>
-            /* limit search input length */
-            .search input{max-width:360px}
-            /* make UI elements pop on dark background */
-            .container{border-left:4px solid rgba(247,201,72,0.08)}
-            thead th{background:linear-gradient(90deg,rgba(7,204,255,0.08),rgba(247,201,72,0.08));color:#dfe9f3}
-            tbody td{background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent)}
-            /* avoid tiny vertical jumps on hover */
-            tr:hover td{background:linear-gradient(90deg,rgba(7,204,255,0.06),rgba(247,201,72,0.04));}
-
-            /* Ensure fixed table layout so column widths align and image column stays consistent */
-            .table{table-layout:fixed;width:100%}
-            .table td, .table th{vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
-            /* make image column fixed-width and center images */
-            .img-wrap{display:flex;align-items:center;justify-content:center;min-width:92px;max-width:92px;padding:8px 4px}
-            .img-wrap img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid rgba(255,255,255,0.02);box-shadow:0 6px 18px rgba(7,204,255,0.06);display:block;margin:0 auto}
-
-            .action-btn{padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:transparent;color:#071428;cursor:pointer;font-weight:600}
-            .action-edit{background:linear-gradient(90deg,#f7c948,#07c);color:#071428}
-            .action-delete{background:linear-gradient(90deg,#ff5c5c,#ff8a8a);color:#071428}
-            /* modal */
-            .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(2,6,23,0.6),rgba(2,6,23,0.85));z-index:9999}
-            .modal.active{display:flex}
-            .modal-card{width:420px;background:var(--card);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 8px 40px rgba(2,6,23,0.7)}
-            .modal-card h3{margin:0 0 10px}
-            .modal-row{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
-            .modal-row input, .modal-row textarea{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
-            .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
-        </style>
-
-        <!-- Edit modal -->
-        <div id="editModal" class="modal" aria-hidden="true">
-            <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editTitle">
-                <h3 id="editTitle">Chỉnh sửa sản phẩm</h3>
-                <div class="modal-row"><label>Title</label><input id="modalTitle" type="text"></div>
-                <div class="modal-row"><label>Price ($)</label><input id="modalPrice" type="number" step="0.01"></div>
-                <div class="modal-row"><label>Description</label><textarea id="modalDescription" rows="3"></textarea></div>
-                <div class="modal-row"><label>Image URL (first image)</label><input id="modalImage" type="url"></div>
-                <div class="modal-actions">
-                    <button class="btn secondary" onclick="closeModal()">Hủy</button>
-                    <button class="btn" onclick="saveEdit()">Lưu</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table class="table table-hover align-middle" aria-label="Danh sách sản phẩm">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width:48px">ID</th>
-                        <th>Product</th>
-                        <th>Slug</th>
-                        <th style="width:110px">Price</th>
-                        <th>Category</th>
-                        <th style="width:92px">Image</th>
-                        <th style="width:130px">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="table-body">
-                    <!-- Rows injected by JS -->
-                </tbody>
-            </table>
-        </div>
-
-        <div class="pagination" id="pagination"></div>
-        <div class="footer-note">Sử dụng dropdown để chọn số sản phẩm/1 trang (5, 10, 20) • Nhấn chọn cách sắp xếp từ "Sắp xếp"</div>
-    </div>
-
+    <title>Document</title>
     <script src="baitaptrenlop2.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+
+<body>
+    <div>
+        <table>
+            <thead>
+                <tr>
+                    <th>
+                        id
+                    </th>
+                    <th>
+                        title
+                    </th>
+                    <th>
+                        views
+                    </th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+
+            </tbody>
+        </table>
+    </div>
+    <div>
+        <input type="text" placeholder="id" id="id_txt" />
+        <input type="text" placeholder="title" id="title_txt" />
+        <input type="text" placeholder="views" id="views_txt" />
+        <input type="submit" value="Save" onclick="Save()">
+    </div>
+    <h2>Comments</h2>
+    <div>
+        <table>
+            <thead>
+                <tr>
+                    <th>id</th>
+                    <th>text</th>
+                    <th>Thao tác</th>
+                </tr>
+            </thead>
+            <tbody id="comments-table-body">
+            </tbody>
+        </table>
+    </div>
+    <div>
+        <input type="text" placeholder="id" id="comment_id_txt" />
+        <input type="text" placeholder="text" id="comment_text_txt" />
+        <input type="submit" value="Save Comment" onclick="SaveComment()">
+        <input type="submit" value="Update Comment" onclick="UpdateComment()">
+    </div>
 </body>
+
 </html>
